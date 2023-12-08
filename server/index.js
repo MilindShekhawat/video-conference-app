@@ -28,9 +28,20 @@ io.on('connection', (socket) => {
     userToSocketMap.set(username, socket.id);
     socketToUserMap.set(socket.id, username);
 
+    //Tells that a user joined the room to all other users in the room
     io.to(room).emit('userjoined', { username, id: socket.id });
     socket.join(room);
     io.to(socket.id).emit('joinroom', { username, room });
+  });
+
+  socket.on('sendOffer', (payload) => {
+    const { offer, to } = payload;
+    io.to(to).emit('receiveOffer', { offer, from: socket.id });
+  });
+
+  socket.on('sendAnswer', (payload) => {
+    const { answer, to } = payload;
+    io.to(to).emit('receiveAnswer', { answer, from: socket.id });
   });
 });
 
