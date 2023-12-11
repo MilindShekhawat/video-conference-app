@@ -31,7 +31,7 @@ io.on('connection', (socket) => {
     //Tells that a user joined the room to all other users in the room
     io.to(room).emit('userjoined', { username, id: socket.id });
     socket.join(room);
-    io.to(socket.id).emit('joinroom', { username, room });
+    io.to(socket.id).emit('joinroom', payload);
   });
 
   socket.on('sendOffer', (payload) => {
@@ -42,6 +42,16 @@ io.on('connection', (socket) => {
   socket.on('sendAnswer', (payload) => {
     const { answer, to } = payload;
     io.to(to).emit('receiveAnswer', { answer, from: socket.id });
+  });
+
+  socket.on('negotiation needed', (payload) => {
+    const { offer, to } = payload;
+    io.to(to).emit('negotiation needed', { offer, from: socket.id });
+  });
+
+  socket.on('negotiation done', (payload) => {
+    const { answer, to } = payload;
+    io.to(to).emit('negotiation final', { answer, from: socket.id });
   });
 });
 
