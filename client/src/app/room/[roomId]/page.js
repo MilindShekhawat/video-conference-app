@@ -4,9 +4,11 @@ import Link from 'next/link';
 import React, { useCallback, useEffect, useState } from 'react';
 import ReactPlayer from 'react-player';
 import peer from '@/services/peer';
+import Image from 'next/image';
 
+import SideArea from './SideArea';
+import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { AspectRatio } from '@/components/ui/aspect-ratio';
 
 export default function room() {
   const [remoteSocketId, setRemoteSocketId] = useState(null);
@@ -115,29 +117,55 @@ export default function room() {
   ]);
 
   return (
-    <main>
-      <Link href='/'>Home</Link>
-      {remoteSocketId && (
-        <>
-          <p>Remote User Connected</p>
-          <Button onClick={() => handleCall()} variant='outline'>
-            Video
-          </Button>
-          <Button onClick={() => handleNegotiationNeeded()}>Negotiate</Button>
-        </>
-      )}
-      {myStream && (
-        <>
-          MyStream
-          <ReactPlayer url={myStream} playing width='20%' height='20%' />
-        </>
-      )}
-      {remoteStream && (
-        <>
-          RemoteStream
-          <ReactPlayer url={remoteStream} playing width='20%' height='20%' />
-        </>
-      )}
+    <main className='flex h-screen text-white bg-stone-800'>
+      <div className='flex flex-col justify-between w-full p-2'>
+        <div className='flex p-3 rounded-lg bg-stone-700'>
+          <Link href='/'>Home</Link>
+        </div>
+        <div className='flex flex-wrap items-center h-full gap-2 p-3 px-4'>
+          <div className='flex-1 basis-28 object-contain w-[700px] h-auto rounded-lg bg-stone-700'></div>
+          {myStream && (
+            <ReactPlayer
+              url={myStream}
+              playing
+              width='100%'
+              height='100%'
+              className='rounded-lg'
+            />
+          )}
+          {remoteStream && (
+            <ReactPlayer
+              url={remoteStream}
+              playing
+              width='100%'
+              height='100%'
+              className='rounded-lg'
+            />
+          )}
+        </div>
+        <div className='flex justify-center p-3 rounded-lg bg-stone-700'>
+          {remoteSocketId ? (
+            <div className='flex gap-3'>
+              <Button onClick={() => handleCall()}>Call</Button>
+              <Button onClick={() => handleNegotiationNeeded()}>
+                Negotiate
+              </Button>
+            </div>
+          ) : (
+            <div className='flex gap-3'>
+              <Button disabled onClick={() => handleCall()}>
+                <Loader2 className='w-4 h-4 mr-2 animate-spin' />
+                Call
+              </Button>
+              <Button disabled onClick={() => handleNegotiationNeeded()}>
+                <Loader2 className='w-4 h-4 mr-2 animate-spin' />
+                Negotiate
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+      <SideArea />
     </main>
   );
 }
