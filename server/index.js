@@ -1,6 +1,6 @@
 import express from 'express';
 import { createServer } from 'node:http';
-import { Server } from 'socket.io'; //
+import { Server } from 'socket.io';
 
 const app = express();
 const server = createServer(app);
@@ -10,11 +10,6 @@ const io = new Server(server, {
   },
 });
 
-//TODO Temp maps to store username-socketid relationship. Replace with DB
-const userToSocketMap = new Map();
-const socketToUserMap = new Map();
-
-//Socket Logic
 io.on('connection', (socket) => {
   console.log(`Socket Connected:`, socket.id);
 
@@ -22,37 +17,36 @@ io.on('connection', (socket) => {
     console.log(`Socket Disconnected:`, socket.id);
   });
 
-  //JoinRoom Logic
-  socket.on('joinroom', (payload) => {
-    const { username, room } = payload;
-    userToSocketMap.set(username, socket.id);
-    socketToUserMap.set(socket.id, username);
-
-    //Tells that a user joined the room to all other users in the room
-    io.to(room).emit('userjoined', { username, id: socket.id });
-    socket.join(room);
-    io.to(socket.id).emit('joinroom', payload);
-  });
-
-  socket.on('sendOffer', (payload) => {
-    const { offer, to } = payload;
-    io.to(to).emit('receiveOffer', { offer, from: socket.id });
-  });
-
-  socket.on('sendAnswer', (payload) => {
-    const { answer, to } = payload;
-    io.to(to).emit('receiveAnswer', { answer, from: socket.id });
-  });
-
-  socket.on('negotiation needed', (payload) => {
-    const { offer, to } = payload;
-    io.to(to).emit('negotiation needed', { offer, from: socket.id });
-  });
-
-  socket.on('negotiation done', (payload) => {
-    const { answer, to } = payload;
-    io.to(to).emit('negotiation final', { answer, from: socket.id });
-  });
+  socket.on('joinRoom', handleJoinRoom);
+  socket.on('offer', handleOffer);
+  socket.on('answer', handleAnswer);
+  socket.on('ice-candidate', handleIceCandidate);
 });
+
+function handleJoinRoom(data) {
+  const { userName, room } = data;
+  console.log('New user joined', userName);
+
+  socket.emit('joinRoom', { userName, room });
+  socket.join(room);
+  io.to(room).emit('newUserJoined', { userName, room });
+}
+
+function handleOffer(data) {
+  const { offer, to } = data;
+  console.log('Offer given');
+  io.to(to).emit('offer', { offer, from: socket.id });
+}
+
+function handleAnswer(data) {
+  const { answer, to } = data;
+  console.log('Answer given');
+  io.to(to).emit('answer', { answer, from: socket.id });
+}
+
+function handleIceCandidate(data) {
+  const { target, candidate } = data;
+  io.to(target).emit('ice-candidate', candidate);
+}
 
 server.listen(5000, () => console.log(`Server running on port 5000`));

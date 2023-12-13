@@ -14,106 +14,97 @@ export default function room() {
   const [remoteSocketId, setRemoteSocketId] = useState(null);
   const [myStream, setMyStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
+  const [myPeer, setMyPeer] = useState(null);
+  const [remotePeer, setRemotePeer] = useState(null);
 
-  const handleUserJoined = (payload) => {
-    setRemoteSocketId(payload.id);
-    console.log('handleuserjoined', payload);
+  //Stores the socketId of the user who joined the room
+  const handleNewUserJoined = (data) => {
+    const { userName, room } = data;
+    console.log(data);
+    console.log(`${userName} joined the room`);
+    setRemoteSocketId(socket.id);
   };
 
-  const handleOffer = async (payload) => {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: true,
-    });
-    // setMyStream(stream);
-    const { offer, from } = payload;
-    setRemoteSocketId(from);
-    const answer = await peer.getAnswer(offer);
-    console.log('handleoffer', payload);
-    socket.emit('sendAnswer', { answer, to: from });
-  };
-
-  const handleAnswer = async (payload) => {
-    const { answer, from } = payload;
-    peer.setLocalDescription(answer);
-    console.log('MyStream', myStream);
-    if (myStream) {
-      for (const track of myStream.getTracks()) {
-        peer.peer.addTrack(track, myStream);
-      }
-    }
-    console.log('handleanswer', payload);
-  };
-
-  const handleNegotiationNeeded = useCallback(async () => {
-    const offer = await peer.getOffer();
-    console.log('handleNegotiationNeeded', offer);
-    socket.emit('negotiation needed', { offer, to: remoteSocketId });
-  }, [remoteSocketId, socket]);
-
-  const handleNegotiationIncoming = async (payload) => {
-    const { offer, from } = payload;
-    const answer = await peer.getAnswer(offer);
-    console.log('handleNegotiationIncoming', payload);
-    socket.emit('negotiation done', { answer, to: from });
-  };
-
-  const handleNegotiationFinal = async (payload) => {
-    const { answer, from } = payload;
-    await peer.setLocalDescription(answer);
-    console.log('handleNegotiationFinal', payload);
-  };
-
+  //Handles the onClick event of the Call button
   const handleCall = async () => {
+    //Gets the stream of current user
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
-      video: true,
+      video: false,
     });
     setMyStream(stream);
-    const offer = await peer.getOffer();
-    socket.emit('sendOffer', { offer, to: remoteSocketId });
+    //Create a peer for current user
+    createPeer(socket.id);
+    socket.emit('offer', { offer, to: remoteSocketId });
   };
 
-  useEffect(() => {
-    peer.peer.addEventListener('track', async (event) => {
-      const remoteStream = event.streams;
-      console.log('remoteStream', remoteStream);
-      setRemoteStream(remoteStream[0]);
-      console.log('setRemoteStream', remoteStream[0]);
+  const createPeer = (mySocketId) => {
+    const peer = new RTCPeerConnection({
+      iceServers: [
+        {
+          urls: [
+            'stun:stun.l.google.com:19302',
+            'stun:global.stun.twilio.com:3478',
+          ],
+        },
+      ],
     });
-  }, [setRemoteStream]);
+    peer.onicecandidate = handleICECandidateEvent;
+    peer.ontrack = handleTrackEvent;
+    peer.onnegotiationneeded = () => handleNegotiationNeededEvent();
+    return peer;
+  };
 
+  const handleICECandidate = (data) => {
+    const candidate = new RTCIceCandidate(data);
+    peer.addIceCandidate(candidate);
+  };
+  const handleICECandidateEvent = (e) => {
+    if (e.candidate) {
+      const data = {
+        to: remoteSocketId,
+        candidate: e.candidate,
+      };
+      //send data to room page
+      socket.emit('ice-candidate', data);
+    }
+  };
+
+  const handleTrackEvent = (e) => {
+    remoteStream = e.streams[0];
+  };
+
+  const handleNegotiationNeededEvent = async () => {
+    const offer = await myPeer.createOffer();
+    await myPeer.setLocalDescription(new RTCSessionDescription(offer));
+    socket.emit('offer', { offer, to: remoteSocketId });
+  };
+
+  const handleGettingOffer = async (data) => {
+    const { offer, from } = data;
+    createPeer(from);
+    const answer = await peer.getAnswer(offer);
+    socket.emit('answer', { answer, to: from });
+  };
+  const handleGettingAnswer = async (data) => {};
+
+  //Handles all socket events
   useEffect(() => {
-    peer.peer.addEventListener('negotiation needed', handleNegotiationNeeded);
+    socket.on('newUserJoined', handleNewUserJoined);
+    socket.on('offer', handleGettingOffer);
+    socket.on('answer', handleGettingAnswer);
+    socket.on('ice-candidate', handleICECandidate);
     return () => {
-      peer.peer.removeEventListener(
-        'negotiation needed',
-        handleNegotiationNeeded
-      );
-    };
-  }, [handleNegotiationNeeded]);
-
-  useEffect(() => {
-    socket.on('userjoined', handleUserJoined);
-    socket.on('receiveOffer', handleOffer);
-    socket.on('receiveAnswer', handleAnswer);
-    socket.on('negotiation needed', handleNegotiationIncoming);
-    socket.on('negotiation final', handleNegotiationFinal);
-
-    return () => {
-      socket.off('userjoined');
-      socket.off('receiveOffer');
-      socket.off('receiveAnswer');
-      socket.off('negotiation needed');
-      socket.off('negotiation final');
+      socket.off('newUserJoined');
+      socket.off('offer');
+      socket.off('answer');
     };
   }, [
     socket,
-    handleUserJoined,
+    handleNewUserJoined,
     handleOffer,
     handleAnswer,
-    handleNegotiationIncoming,
-    handleNegotiationFinal,
+    handleICECandidate,
   ]);
 
   return (

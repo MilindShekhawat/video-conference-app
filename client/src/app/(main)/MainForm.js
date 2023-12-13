@@ -1,6 +1,5 @@
 'use client';
 import { useState } from 'react';
-import Link from 'next/link';
 import socket from '@/lib/socket';
 import { useRouter } from 'next/navigation';
 
@@ -18,24 +17,25 @@ import { Button } from '@/components/ui/button';
 
 export default function MainForm() {
   const router = useRouter();
-  const [username, SetUsername] = useState('');
+  const [userName, SetUserName] = useState('');
   const [room, SetRoom] = useState('');
 
   //Emits joinroom event to server
   const handleSubmit = (e) => {
     e.preventDefault();
-    socket.emit('joinroom', { username, room });
+    socket.emit('joinRoom', { userName, room });
     handleJoinRoom();
   };
 
   //Listens for joinroom event from server and redirects to room page
   const handleJoinRoom = () => {
-    socket.on('joinroom', (payload) => {
-      console.log('JoinRoom Payload:', payload);
-      router.push(`/room/${payload.room}`);
+    socket.on('joinRoom', (data) => {
+      const { userName, room } = data;
+      router.push(`/room/${room}`);
     });
+    //Cleanup
     return () => {
-      socket.off('joinroom');
+      socket.off('joinRoom');
     };
   };
 
@@ -53,8 +53,8 @@ export default function MainForm() {
               <Input
                 id='username'
                 type='text'
-                value={username}
-                onChange={(e) => SetUsername(e.target.value)}
+                value={userName}
+                onChange={(e) => SetUserName(e.target.value)}
               />
             </div>
             <div className='flex flex-col space-y-1.5'>
@@ -70,10 +70,13 @@ export default function MainForm() {
         </form>
       </CardContent>
       <CardFooter className='flex justify-between'>
-        <Button asChild form='loginForm'>
-          <Link href='/meet'>Join</Link>
-        </Button>
-        <Button variant='destructive' form='loginForm'>
+        <Button form='loginForm'>Join</Button>
+        <Button
+          variant='destructive'
+          onClick={() => {
+            SetUsername('');
+            SetRoom('');
+          }}>
           Cancel
         </Button>
       </CardFooter>
